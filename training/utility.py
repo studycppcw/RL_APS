@@ -111,7 +111,8 @@ def create_folder_path(env_config: dict, is_training: bool) -> str:
 
 def create_folder_name(algo: str, env_config: dict, reward_type: str, state_type: str, num_train: int,
                        side: Union[int, Tuple[int]], folder_path: str, threshold: float = None,
-                       angle_ratio: float = None, v_ratio: float = None) -> str:
+                       angle_ratio: float = None, v_ratio: float = None, seg_ratio: float = None, 
+                       steps_ratio: float = None, steering_ratio: float = None, acceleration_ratio: float = None) -> str:
     """
     Return a structured folder path based on environment config.
 
@@ -153,6 +154,18 @@ def create_folder_name(algo: str, env_config: dict, reward_type: str, state_type
         v_ratio = f"{v_ratio:.1f}".replace(".", "")
         folder_name = folder_name + f'_th{threshold}_ar{angle_ratio}_vr{v_ratio}'
 
+    seg_ratio = f"{seg_ratio:.1f}".replace(".", "")
+    folder_name = folder_name + f'_segr{seg_ratio}'
+    
+    steps_ratio = f"{steps_ratio:.0001f}".replace(".", "")
+    folder_name = folder_name + f'_stpr{steps_ratio}'
+    
+    steering_ratio = f"{steering_ratio:.01f}".replace(".", "")
+    folder_name = folder_name + f'_strr{steering_ratio}'
+    
+    acceleration_ratio = f"{acceleration_ratio:.01f}".replace(".", "")
+    folder_name = folder_name + f'_acclr{acceleration_ratio}'
+    
     # Add id number
     id_num = generate_unique_id(folder_path + folder_name)
     if id_num:

@@ -11,12 +11,12 @@ ray.init()
 env_name = Parking
 config = Config(car_length=4.0, car_width=2.0,
                 wheel_length=0.75, wheel_width=0.35,
-                parking_length=6.0, parking_width=4.0,
-                max_distance=25.0, max_steps=80,
-                acceleration_limit=1.0, steering_limit=PI/4, velocity_limit=10.0,
-                max_angle_error=PI/12, center_threshold=1.0, penalty_ratio={'angle': 0.35, 'velocity': 0.15},
+                parking_length=6.0, parking_width=2.2,
+                max_distance=25.0, max_steps=900,
+                acceleration_limit=1.0, steering_limit=0.59, velocity_limit=0.6,
+                max_angle_error=PI/12, center_threshold=0.5, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.0, 'steps': 0.000, 'steering': 0.00, 'acceleration': 0.00},
                 reward_type='type4', state_type='type4',
-                side=1, car_loc_randomize_range=(6.0, 7.0), initial_distance_range=(5.0, 7.0)
+                side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(3.0, 3.5)
                 )
 env_config = {"render_mode": "no_render",
               "action_type": "continuous",
@@ -28,11 +28,11 @@ env_config = {"render_mode": "no_render",
 num_train = 200
 side = config.side
 threshold = config.center_threshold
-angle_ratio, v_ratio = config.penalty_ratio['angle'], config.penalty_ratio['velocity']
+angle_ratio, v_ratio, seg_ratio, steps_ratio, steering_ratio, acceleration_ratio = config.penalty_ratio['angle'], config.penalty_ratio['velocity'], config.penalty_ratio['segment'], config.penalty_ratio['steps'], config.penalty_ratio['steering'],config.penalty_ratio['acceleration']
 
 folder_path = create_folder_path(env_config, is_training=True)
 folder_name = create_folder_name('PPO', env_config, config.reward_type, config.state_type,
-                                 num_train, side, folder_path, threshold, angle_ratio, v_ratio)
+                                 num_train, side, folder_path, threshold, angle_ratio, v_ratio, seg_ratio, steps_ratio, steering_ratio, acceleration_ratio)
 
 algo = (
     PPOConfig()

@@ -132,6 +132,14 @@ class Parking(gym.Env):
         self.static_parking_lot_vertices = None
         self.v_penalty = self.config.penalty_ratio['velocity']
         self.angle_penalty = self.config.penalty_ratio['angle']
+        self.standstill_steps = None
+        self.prev_v = None
+        self.curr_seg = None
+        self.seg_penalty = self.config.penalty_ratio['segment']
+        self.steps_penalty = self.config.penalty_ratio['steps']
+        self.steering_penalty = self.config.penalty_ratio['steering']
+        self.acceleration_penalty = self.config.penalty_ratio['acceleration']
+        self.prev_action = None
 
     def step(self, action):
         """
@@ -171,16 +179,20 @@ class Parking(gym.Env):
                         f"Valid values are from 0 to 5")
 
             self.car.loc_old = self.car.car_loc
+            self.prev_v = self.car.v
             self.car.kinematic_act(action)
 
+            
+            reward = self._reward(action)
+            
             if self.render_mode == "human":
-                self.render()
-            reward = self._reward()
+                self.render(reward)
             self.state = self.get_normalized_state()
+            self.prev_action = action
 
         return self.state, reward, self.terminated, self.truncated, {"step": self.run_steps}
 
-    def render(self):
+    def render(self, reward):
         """
         Draw the parking environment.
 
@@ -194,20 +206,20 @@ class Parking(gym.Env):
             )
             return
         else:
-            return self._render(self.render_mode)
+            return self._render(self.render_mode, reward)
 
-    def _render(self, mode: str):
+    def _render(self, mode: str, reward):
         if mode == "human":
             self.renderer.initialize_window()
             self.renderer.draw_static_elements(self.parking_lot_vertices, self.static_parking_lot_vertices, self.static_cars_vertices)
-            self.renderer.render(self.car, self.car.loc_old)
+            self.renderer.render(self.car, self.car.loc_old, reward, self.parking_lot)
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
 
         # set the side and initial positions
         self.side = self.parking_strategy.set_initial_loc(self.config.side)
-        if self.training_mode == 'off':
+        if 0: #self.training_mode == 'off':
             self.parking_lot = self.parking_strategy.set_initial_parking_loc(self.side, self.renderer.window_width,
                                                                              self.renderer.window_height,
                                                                              self.config.window_width_offset,
@@ -233,6 +245,9 @@ class Parking(gym.Env):
         self.terminated = False
         self.truncated = False
         self.run_steps = 0
+        self.standstill_steps = 0
+        self.curr_seg  = 0
+        self.prev_action = np.array([0,0])
 
         if self.render_mode == 'human':
             self.renderer.reset_render()
@@ -258,7 +273,7 @@ class Parking(gym.Env):
         distances = np.array(distances).flatten()
 
         # normalization
-        normalized_distances = distances / self.config.velocity_limit
+        normalized_distances = distances / self.config.max_distance
 
         # type1 state (default state)
         if self.config.state_type == 'type1':
@@ -311,41 +326,75 @@ class Parking(gym.Env):
 
         return np.array([new_x, new_y])
 
-    def _reward(self) -> int:
+    def _reward(self,action) -> int:
         self.run_steps += 1
         reward = 0
+        
+        is_standstill = self.is_car_in_standstill(self.car.v)
+        
+        self.check_segment_number()
 
         # check the number of the step
         if self.run_steps >= self.config.max_steps:
-            reward -= 1
+            reward -= 500
             self.truncated = True
             self.terminated = True
             print("The maximum step reaches")
             return reward
-
+        
+        # check if segment number exceed limit
+        # if self.curr_seg >= 8:
+        #     reward -= 1
+        #     self.truncated = True
+        #     self.terminated = True
+        #     print("The maximum segment number reaches")
+        #     return reward
+        
         # check the location
-        if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
-            reward -= 1
-            self.terminated = True
-            print("The car crossed the parking lot vertically/horizontally.")
-            return reward
+        # if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
+        #     reward -= 1
+        #     self.terminated = True
+        #     print("The car crossed the parking lot vertically/horizontally.")
+        #     return reward
 
         if self.check_max_distance(self.parking_lot_vertices, self.car.car_loc, self.config.max_distance):
-            reward -= 1
+            reward -= 200
             self.terminated = True
             print(f"The distance between the car and the parking is more than {self.config.max_distance} meters")
             return reward
 
+        # check if car stopped outside of slot
+        if is_standstill and not(self.is_car_in_parking_lot()):
+            reward -= 100
+            self.terminated = True
+            print("car stop outside of slot")
+            return reward
+        
         # check a collision
-        if self.check_collision():
-            reward -= 1
+        if 0: #self.check_collision():
+            reward -= 1000
             self.terminated = True
             print("The car has a collision")
             return reward
+        
+        # add penalty for segment numer 
+        reward -= self.curr_seg*self.seg_penalty
+        
+        # add penalty for steps 
+        reward -= self.steps_penalty #self.run_steps*self.steps_penalty
+        
+        # add penalty for steering change
+        reward -= abs(action[1]-self.prev_action[1])*self.steering_penalty
+        
+        # add penalty for acceleration change
+        reward -= abs(action[0]-self.prev_action[0])*self.acceleration_penalty
+        
+        # add penalty for error wrt goal
+        reward += self.calc_reward_to_goal()
 
         # type1 (default reward)
         if self.config.reward_type == 'type1':
-            if self.is_car_in_parking_lot():
+            if self.is_car_in_parking_lot() and is_standstill:
                 reward += 1
                 self.terminated = True
                 print("successful parking")
@@ -353,7 +402,7 @@ class Parking(gym.Env):
 
         # type2 (guidance reward)
         if self.config.reward_type == 'type2':
-            if self.is_car_in_parking_lot():
+            if self.is_car_in_parking_lot() and is_standstill:
                 if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, self.config.center_threshold):
                     reward += 1
                     self.terminated = True
@@ -368,7 +417,7 @@ class Parking(gym.Env):
 
         # type3 (velocity)
         if self.config.reward_type == 'type3':
-            if self.is_car_in_parking_lot():
+            if self.is_car_in_parking_lot() and is_standstill:
                 reward += 1
                 self.terminated = True
                 print("successful parking")
@@ -381,7 +430,7 @@ class Parking(gym.Env):
 
         # type4 (velocity and guidance reward)
         if self.config.reward_type == 'type4':
-            if self.is_car_in_parking_lot():
+            if self.is_car_in_parking_lot() and is_standstill:
                 if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, self.config.center_threshold):
 
                     reward += 1
@@ -400,8 +449,68 @@ class Parking(gym.Env):
                     # Adjust reward
                     reward -= angle_penalty
                 return reward
-
+            
+        if self.training_mode == 'off':
+            print("current total reward is: ", reward)
+            
         return reward
+    
+    def check_segment_number(self):
+        if(self.car.v > 0 and self.prev_v <= 0) or (self.car.v < 0 and self.prev_v >= 0):
+            self.curr_seg += 1
+            if self.training_mode == 'off':
+                print("curr seg is ", self.curr_seg)
+        
+    
+    def is_car_in_standstill(self, v_current: float) -> bool:
+        if(abs(v_current) < 0.001): 
+            self.standstill_steps = self.standstill_steps + 1
+        else: 
+            self.standstill_steps = 0
+        if(self.standstill_steps > 5):
+            return True
+        else: 
+            return False
+        
+    def calc_reward_to_goal(self) -> float:
+        parking_angle = self.get_parking_angle(self.parking_type, self.side)
+        # transform to goal frame
+        distance = self.transform_point(self.car.car_loc[0], self.car.car_loc[1],
+                                        self.parking_lot[0], self.parking_lot[1],parking_angle[0])
+        normalized_distance = distance
+        normalized_distance = normalized_distance/ np.array([10, 10]) #self.config.max_distance
+        # dist_reward = -2*np.exp((0.5*(normalized_distance[0]**2) + 0.4*(normalized_distance[1]**2)))
+        
+        euclidean_distance = np.sqrt(distance[0]**2 + distance[1]**2)
+        normalized_euclidean_distance = euclidean_distance / 10
+        max_distance = 1.0
+        dist_threshold = 0.5
+        max_dist_reward = 5.0
+        mid_dist_reward = 1.0
+        min_dist_reward = 0.0
+        if (normalized_euclidean_distance >= dist_threshold and normalized_euclidean_distance < max_distance): 
+            dist_reward = ((mid_dist_reward - min_dist_reward)/(max_distance - dist_threshold))*(max_distance - normalized_euclidean_distance) + min_dist_reward
+        elif (normalized_euclidean_distance < dist_threshold):
+            dist_reward = ((max_dist_reward - mid_dist_reward)/dist_threshold)*(dist_threshold - normalized_euclidean_distance) + mid_dist_reward
+        else:
+            dist_reward = min_dist_reward
+        # calculate the angle error
+        if isinstance(parking_angle, list):
+            angle_errors = [np.abs((self.car.psi - angle + PI) % (2 * PI) - PI) for angle in parking_angle]
+            angle_error = min(angle_errors)
+        else:
+            angle_error = np.abs((self.car.psi - parking_angle + PI) % (2 * PI) - PI)        
+        normalized_angle = angle_error/PI #self.config.max_angle_error
+
+        angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
+        reward = dist_reward + angle_reward
+        
+        if self.training_mode == 'off':
+            print("error to goal:", distance[0], distance[1], angle_error)
+            print("normalized error to goal: ", normalized_distance[0], normalized_distance[1], normalized_angle)
+            print("goal reward:", dist_reward, angle_reward)
+        return reward
+        
 
     @staticmethod
     def is_car_in_threshold(parking_lot: np.ndarray, car_loc: np.ndarray, center_threshold: np.float32) -> bool:

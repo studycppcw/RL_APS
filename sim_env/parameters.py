@@ -237,7 +237,7 @@ class Config:
         self.state_type = state_type
 
         if penalty_ratio is None:
-            self.penalty_ratio = {'angle': 0.25, 'velocity': 0.25}
+            self.penalty_ratio = {'angle': 0.25, 'velocity': 0.25, 'segment': 0.0, 'steps': 0.0, 'steering': 0.0, 'acceleration': 0.0}
         self.penalty_ratio = penalty_ratio
 
         # Action limits
@@ -282,7 +282,7 @@ class Config:
                         4: (PI - PI/12, PI + PI/12),
                     },
                     "parallel": {
-                        1: (PI/6, PI/3),
+                        1: (-0.05, 0.05), #(-0.35, 0.35),
                         2: (-PI/3, -PI/6),
                         3: (-PI/12, PI/12),
                         4: (-PI/12 * 11, PI/12 * 11),
