@@ -351,11 +351,11 @@ class Parking(gym.Env):
         #     return reward
         
         # check the location
-        # if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
-        #     reward -= 1
-        #     self.terminated = True
-        #     print("The car crossed the parking lot vertically/horizontally.")
-        #     return reward
+        if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
+            reward -= 100
+            # self.terminated = True
+            print("The car crossed the parking lot vertically/horizontally.")
+            return reward
 
         if self.check_max_distance(self.parking_lot_vertices, self.car.car_loc, self.config.max_distance):
             reward -= 200
@@ -371,8 +371,8 @@ class Parking(gym.Env):
             return reward
         
         # check a collision
-        if 0: #self.check_collision():
-            reward -= 1000
+        if self.check_collision():
+            # reward -= 200
             self.terminated = True
             print("The car has a collision")
             return reward
