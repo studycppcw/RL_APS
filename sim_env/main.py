@@ -45,7 +45,7 @@ env_config = {"render_mode": "human",
               "parking_type": "parallel",
               "training_mode": "off",
               'config': config}
-folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_26' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
+folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_29' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
 env = Parking(env_config)
 
 folder_path = create_folder_path(env_config, is_training=False)

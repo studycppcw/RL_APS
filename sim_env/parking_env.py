@@ -482,9 +482,9 @@ class Parking(gym.Env):
         # dist_reward = -2*np.exp((0.5*(normalized_distance[0]**2) + 0.4*(normalized_distance[1]**2)))
         
         euclidean_distance = np.sqrt(distance[0]**2 + distance[1]**2)
-        normalized_euclidean_distance = euclidean_distance / 10
+        normalized_euclidean_distance = euclidean_distance / 20
         max_distance = 1.0
-        dist_threshold = 0.5
+        dist_threshold = 0.25
         max_dist_reward = 5.0
         mid_dist_reward = 1.0
         min_dist_reward = 0.0
