@@ -38,6 +38,28 @@ algo = (
     PPOConfig()
     .environment(env=env_name, env_config=env_config)
     .rollouts(num_rollout_workers=1)
+    # .training(
+    #     lr=1e-4,
+    #     gamma=0.99,
+    #     lambda_=0.95,
+    #     clip_param=0.2,
+    #     vf_loss_coeff=0.5,
+    #     entropy_coeff=0.001,
+    #     train_batch_size=4000,
+    #     sgd_minibatch_size=128,
+    #     num_sgd_iter=15,
+    # )
+    .training(
+        lr=5e-5,
+        gamma=0.99,
+        lambda_=1.0, #0.95,
+        clip_param=0.2, #0.2,
+        vf_loss_coeff=1.0, #0.5,
+        entropy_coeff=0.0, #0.001,
+        train_batch_size=4000,
+        sgd_minibatch_size=128,
+        num_sgd_iter=30, #15,
+    )
     .resources(num_gpus=int(os.environ.get("RLLIB_NUM_GPUS", "0")))
     .framework("torch")
     .evaluation(evaluation_num_workers=1)
