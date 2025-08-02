@@ -140,8 +140,6 @@ class Parking(gym.Env):
         self.steering_penalty = self.config.penalty_ratio['steering']
         self.acceleration_penalty = self.config.penalty_ratio['acceleration']
         self.prev_action = None
-        self.prev_dist_to_goal = None
-        self.normalized_euclidean_distance = None
 
     def step(self, action):
         """
@@ -191,7 +189,6 @@ class Parking(gym.Env):
                 self.render(reward)
             self.state = self.get_normalized_state()
             self.prev_action = action
-            self.prev_dist_to_goal = self.normalized_euclidean_distance
 
         return self.state, reward, self.terminated, self.truncated, {"step": self.run_steps}
 
@@ -251,7 +248,6 @@ class Parking(gym.Env):
         self.standstill_steps = 0
         self.curr_seg  = 0
         self.prev_action = np.array([0,0])
-        self.prev_dist_to_goal = 0
 
         if self.render_mode == 'human':
             self.renderer.reset_render()
@@ -340,9 +336,9 @@ class Parking(gym.Env):
 
         # check the number of the step
         if self.run_steps >= self.config.max_steps:
-            reward -= 1
+            reward -= 500
             self.truncated = True
-            # self.terminated = True
+            self.terminated = True
             print("The maximum step reaches")
             return reward
         
@@ -356,23 +352,23 @@ class Parking(gym.Env):
         
         # check the location
         if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
-            reward -= 1
+            reward -= 100
             # self.terminated = True
             print("The car crossed the parking lot vertically/horizontally.")
             return reward
 
         if self.check_max_distance(self.parking_lot_vertices, self.car.car_loc, self.config.max_distance):
-            reward -= 1
+            reward -= 200
             self.terminated = True
             print(f"The distance between the car and the parking is more than {self.config.max_distance} meters")
             return reward
 
         # check if car stopped outside of slot
         if is_standstill and not(self.is_car_in_parking_lot()):
-            reward -= 0.1
-            # self.terminated = True
+            reward -= 100
+            self.terminated = True
             print("car stop outside of slot")
-            # return reward
+            return reward
         
         # check a collision
         if self.check_collision():
@@ -384,7 +380,7 @@ class Parking(gym.Env):
         # add penalty for segment numer 
         reward -= self.curr_seg*self.seg_penalty
         
-        # add penalty for being idle
+        # add penalty for steps 
         reward -= self.steps_penalty #self.run_steps*self.steps_penalty
         
         # add penalty for steering change
@@ -486,15 +482,15 @@ class Parking(gym.Env):
         # dist_reward = -2*np.exp((0.5*(normalized_distance[0]**2) + 0.4*(normalized_distance[1]**2)))
         
         euclidean_distance = np.sqrt(distance[0]**2 + distance[1]**2)
-        self.normalized_euclidean_distance = euclidean_distance / 20
+        normalized_euclidean_distance = euclidean_distance / 20
         max_distance = 1.0
         dist_threshold = 0.25
         max_dist_reward = 5.0
         mid_dist_reward = 1.0
         min_dist_reward = 0.0
-        if (self.normalized_euclidean_distance >= dist_threshold and self.normalized_euclidean_distance < max_distance): 
+        if (normalized_euclidean_distance >= dist_threshold and normalized_euclidean_distance < max_distance): 
             dist_reward = ((mid_dist_reward - min_dist_reward)/(max_distance - dist_threshold))*(max_distance - normalized_euclidean_distance) + min_dist_reward
-        elif (self.normalized_euclidean_distance < dist_threshold):
+        elif (normalized_euclidean_distance < dist_threshold):
             dist_reward = ((max_dist_reward - mid_dist_reward)/dist_threshold)*(dist_threshold - normalized_euclidean_distance) + mid_dist_reward
         else:
             dist_reward = min_dist_reward
@@ -507,13 +503,12 @@ class Parking(gym.Env):
         normalized_angle = angle_error/PI #self.config.max_angle_error
 
         angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
-        # reward = dist_reward + angle_reward
-        reward = 0.1*(self.normalized_euclidean_distance - self.prev_dist_to_goal)
+        reward = dist_reward + angle_reward
         
         if self.training_mode == 'off':
             print("error to goal:", distance[0], distance[1], angle_error)
             print("normalized error to goal: ", normalized_distance[0], normalized_distance[1], normalized_angle)
-            print("goal reward:", dist_reward, angle_reward, reward)
+            print("goal reward:", dist_reward, angle_reward)
         return reward
         
 
