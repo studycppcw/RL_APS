@@ -377,6 +377,7 @@ class Parking(gym.Env):
         # check a collision
         if self.check_collision():
             # reward -= 200
+            reward -= 1
             self.terminated = True
             print("The car has a collision")
             return reward
@@ -493,9 +494,9 @@ class Parking(gym.Env):
         mid_dist_reward = 1.0
         min_dist_reward = 0.0
         if (self.normalized_euclidean_distance >= dist_threshold and self.normalized_euclidean_distance < max_distance): 
-            dist_reward = ((mid_dist_reward - min_dist_reward)/(max_distance - dist_threshold))*(max_distance - normalized_euclidean_distance) + min_dist_reward
+            dist_reward = ((mid_dist_reward - min_dist_reward)/(max_distance - dist_threshold))*(max_distance - self.normalized_euclidean_distance) + min_dist_reward
         elif (self.normalized_euclidean_distance < dist_threshold):
-            dist_reward = ((max_dist_reward - mid_dist_reward)/dist_threshold)*(dist_threshold - normalized_euclidean_distance) + mid_dist_reward
+            dist_reward = ((max_dist_reward - mid_dist_reward)/dist_threshold)*(dist_threshold - self.normalized_euclidean_distance) + mid_dist_reward
         else:
             dist_reward = min_dist_reward
         # calculate the angle error
@@ -508,7 +509,7 @@ class Parking(gym.Env):
 
         angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
         # reward = dist_reward + angle_reward
-        reward = 0.1*(self.normalized_euclidean_distance - self.prev_dist_to_goal)
+        reward = 10*(self.prev_dist_to_goal - self.normalized_euclidean_distance)
         
         if self.training_mode == 'off':
             print("error to goal:", distance[0], distance[1], angle_error)
