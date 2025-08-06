@@ -142,6 +142,9 @@ class Parking(gym.Env):
         self.prev_action = None
         self.prev_dist_to_goal = None
         self.normalized_euclidean_distance = None
+        self.parking_angle = None
+        self.normalized_angle = None
+        self.prev_normalized_angle = None
 
     def step(self, action):
         """
@@ -192,6 +195,7 @@ class Parking(gym.Env):
             self.state = self.get_normalized_state()
             self.prev_action = action
             self.prev_dist_to_goal = self.normalized_euclidean_distance
+            self.prev_normalized_angle = self.normalized_angle
 
         return self.state, reward, self.terminated, self.truncated, {"step": self.run_steps}
 
@@ -232,6 +236,7 @@ class Parking(gym.Env):
 
         self.parking_lot_vertices = (self.parking_lot +
                                      self.parking_strategy.get_parking_struct(self.parking_type, self.side))
+        self.parking_angle = self.get_parking_angle(self.parking_type, self.side)
         while True:
             car_loc = self.parking_strategy.set_initial_car_loc(self.side, self.parking_lot,
                                                                 self.config.initial_distance_range,
@@ -271,9 +276,9 @@ class Parking(gym.Env):
         # calculate the distance between the car and the parking lot vertices for the coordinate of the car
         distances = []
         for vertex in self.parking_lot_vertices:
-            distance = self.transform_point(vertex[0], vertex[1],
-                                            self.car.car_loc[0], self.car.car_loc[1], self.car.psi)
-            distances.append(distance)
+            distance = self.transform_point(self.car.car_loc[0], self.car.car_loc[1], self.car.psi,
+                                            vertex[0], vertex[1],self.parking_angle[0])
+            distances.append(distance[:2])
         distances = np.array(distances).flatten()
 
         # normalization
@@ -285,9 +290,9 @@ class Parking(gym.Env):
 
         # type2 state (guidance reward)
         elif self.config.state_type == 'type2':
-            guidance = self.transform_point(self.parking_lot[0], self.parking_lot[1],
-                                            self.car.car_loc[0], self.car.car_loc[1], self.car.psi)
-            normalized_guidance = guidance / self.config.max_distance
+            guidance = self.transform_point(self.car.car_loc[0], self.car.car_loc[1], self.car.psi,
+                                            self.parking_lot[0], self.parking_lot[1], self.parking_angle[0])
+            normalized_guidance = guidance[:2] / self.config.max_distance
             state = np.concatenate((normalized_distances, normalized_guidance))  # 10 elements
 
         # type3 state (velocity)
@@ -298,9 +303,9 @@ class Parking(gym.Env):
         # type4 state (both guidance and velocity)
         elif self.config.state_type == 'type4':
             normalized_velocity = np.array([self.car.v / self.config.velocity_limit])
-            guidance = self.transform_point(self.parking_lot[0], self.parking_lot[1],
-                                            self.car.car_loc[0], self.car.car_loc[1], self.car.psi)
-            normalized_guidance = guidance / self.config.max_distance
+            guidance = self.transform_point(self.car.car_loc[0], self.car.car_loc[1], self.car.psi,
+                                            self.parking_lot[0], self.parking_lot[1], self.parking_angle[0])
+            normalized_guidance = guidance[:2] / self.config.max_distance
             state = np.concatenate((normalized_distances, normalized_guidance, normalized_velocity))  # 11 elements
 
         else:
@@ -312,23 +317,32 @@ class Parking(gym.Env):
         return state
 
     @staticmethod
-    def transform_point(x: float, y: float, car_x: float, car_y: float, heading: float) -> np.array(['x', 'y']):
+    def transform_point(ref_x: float, ref_y: float, ref_heading: float, cur_x: float, cur_y: float, cur_heading: float) -> np.array(['x', 'y', 'heading']):
         """
-        Transform the global coordinate system to the local(car) coordinate system
+        Transform the global coordinate system to the local(parking slot) coordinate system
 
         Return:
             np.array: x,y coordinate system of the car
         """
-        # Translate the point to the new origin
-        x -= car_x
-        y -= car_y
+        x = (cur_x - ref_x)*math.cos(ref_heading) + (cur_y - ref_y)*math.sin(ref_heading)
+        y = -(cur_x - ref_x)*math.sin(ref_heading) + (cur_y - ref_y)*math.cos(ref_heading)
+        heading = Parking.wrap_to_pi(cur_heading - ref_heading)
 
-        # Rotate the point based on the heading
-        angle = heading - PI / 2
-        new_x = x * math.cos(-angle) - y * math.sin(-angle)
-        new_y = x * math.sin(-angle) + y * math.cos(-angle)
+        return np.array([x, y, heading])
+    
+    
+    @staticmethod
+    def wrap_to_pi(angle: float) -> float:
+        """
+        Wraps an angle in radians to the range [-pi, pi].
 
-        return np.array([new_x, new_y])
+        Parameters:
+            angle (float): The angle in radians to be wrapped.
+
+        Returns:
+            float: The wrapped angle in radians.
+        """
+        return (angle + PI) % (2 * PI) - PI
 
     def _reward(self,action) -> int:
         self.run_steps += 1
@@ -478,11 +492,10 @@ class Parking(gym.Env):
             return False
         
     def calc_reward_to_goal(self) -> float:
-        parking_angle = self.get_parking_angle(self.parking_type, self.side)
         # transform to goal frame
-        distance = self.transform_point(self.car.car_loc[0], self.car.car_loc[1],
-                                        self.parking_lot[0], self.parking_lot[1],parking_angle[0])
-        normalized_distance = distance
+        distance = self.transform_point(self.parking_lot[0], self.parking_lot[1], self.parking_angle[0],
+                                        self.car.car_loc[0], self.car.car_loc[1], self.car.psi)
+        normalized_distance = distance[:2]
         normalized_distance = normalized_distance/ np.array([10, 10]) #self.config.max_distance
         # dist_reward = -2*np.exp((0.5*(normalized_distance[0]**2) + 0.4*(normalized_distance[1]**2)))
         
@@ -493,27 +506,30 @@ class Parking(gym.Env):
         max_dist_reward = 5.0
         mid_dist_reward = 1.0
         min_dist_reward = 0.0
-        if (self.normalized_euclidean_distance >= dist_threshold and self.normalized_euclidean_distance < max_distance): 
-            dist_reward = ((mid_dist_reward - min_dist_reward)/(max_distance - dist_threshold))*(max_distance - self.normalized_euclidean_distance) + min_dist_reward
-        elif (self.normalized_euclidean_distance < dist_threshold):
-            dist_reward = ((max_dist_reward - mid_dist_reward)/dist_threshold)*(dist_threshold - self.normalized_euclidean_distance) + mid_dist_reward
-        else:
-            dist_reward = min_dist_reward
+        # if (self.normalized_euclidean_distance >= dist_threshold and self.normalized_euclidean_distance < max_distance): 
+        #     dist_reward = ((mid_dist_reward - min_dist_reward)/(max_distance - dist_threshold))*(max_distance - self.normalized_euclidean_distance) + min_dist_reward
+        # elif (self.normalized_euclidean_distance < dist_threshold):
+        #     dist_reward = ((max_dist_reward - mid_dist_reward)/dist_threshold)*(dist_threshold - self.normalized_euclidean_distance) + mid_dist_reward
+        # else:
+        #     dist_reward = min_dist_reward
         # calculate the angle error
-        if isinstance(parking_angle, list):
-            angle_errors = [np.abs((self.car.psi - angle + PI) % (2 * PI) - PI) for angle in parking_angle]
+        if isinstance(self.parking_angle, list):
+            angle_errors = [np.abs((self.car.psi - angle + PI) % (2 * PI) - PI) for angle in self.parking_angle]
             angle_error = min(angle_errors)
         else:
-            angle_error = np.abs((self.car.psi - parking_angle + PI) % (2 * PI) - PI)        
-        normalized_angle = angle_error/PI #self.config.max_angle_error
+            angle_error = np.abs((self.car.psi - self.parking_angle + PI) % (2 * PI) - PI)        
+        self.normalized_angle = angle_error/PI #self.config.max_angle_error
 
-        angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
-        # reward = dist_reward + angle_reward
-        reward = 10*(self.prev_dist_to_goal - self.normalized_euclidean_distance)
+        # angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
+        dist_reward = 10*(self.prev_dist_to_goal - self.normalized_euclidean_distance)
+        angle_reward = 0
+        if np.abs(distance[1]) < 1 and np.abs(distance[0]) < 2:
+            angle_reward = 10*(self.prev_normalized_angle - self.normalized_angle)
+        reward = dist_reward + angle_reward
         
         if self.training_mode == 'off':
             print("error to goal:", distance[0], distance[1], angle_error)
-            print("normalized error to goal: ", normalized_distance[0], normalized_distance[1], normalized_angle)
+            print("normalized error to goal: ", normalized_distance[0], normalized_distance[1], self.normalized_angle)
             print("goal reward:", dist_reward, angle_reward, reward)
         return reward
         

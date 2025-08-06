@@ -84,3 +84,16 @@ Please refer to [doc/training_results.md](https://github.com/taka-rl/RL_APS/blob
 - Improving the parallel agent’s performance, by encouraging the agent to park near the center of the parking lot.
 - Doing the training with different RL algorithms and compare their performance. 
 - Updating used tools version to the latest ones.
+
+## Add project root to Python path 
+
+export PYTHONPATH=$PYTHONPATH:/home/changwang/Documents/RL_APS 
+
+## To evaluate trained agents  
+
+cd sim_env 
+python3 main.py  (need to assign checkpoint folder name to folder_name) 
+
+## To display trained result  
+
+tensorboard --logdir=folder path   (folder path is absolute path of related training_results folder) 
