@@ -145,6 +145,8 @@ class Parking(gym.Env):
         self.parking_angle = None
         self.normalized_angle = None
         self.prev_normalized_angle = None
+        self.prev_normalized_dist = None
+        self.normalized_distance = None
 
     def step(self, action):
         """
@@ -196,6 +198,7 @@ class Parking(gym.Env):
             self.prev_action = action
             self.prev_dist_to_goal = self.normalized_euclidean_distance
             self.prev_normalized_angle = self.normalized_angle
+            self.prev_normalized_dist = self.normalized_distance
 
         return self.state, reward, self.terminated, self.truncated, {"step": self.run_steps}
 
@@ -257,6 +260,7 @@ class Parking(gym.Env):
         self.curr_seg  = 0
         self.prev_action = np.array([0,0])
         self.prev_dist_to_goal = 0
+        self.prev_normalized_dist = 0
 
         if self.render_mode == 'human':
             self.renderer.reset_render()
@@ -370,7 +374,7 @@ class Parking(gym.Env):
         
         # check the location
         if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
-            reward -= 1
+            reward -= 0.2
             # self.terminated = True
             print("The car crossed the parking lot vertically/horizontally.")
             return reward
@@ -496,7 +500,7 @@ class Parking(gym.Env):
         distance = self.transform_point(self.parking_lot[0], self.parking_lot[1], self.parking_angle[0],
                                         self.car.car_loc[0], self.car.car_loc[1], self.car.psi)
         normalized_distance = distance[:2]
-        normalized_distance = normalized_distance/ np.array([10, 10]) #self.config.max_distance
+        self.normalized_distance = normalized_distance/ np.array([10, 10]) #self.config.max_distance
         # dist_reward = -2*np.exp((0.5*(normalized_distance[0]**2) + 0.4*(normalized_distance[1]**2)))
         
         euclidean_distance = np.sqrt(distance[0]**2 + distance[1]**2)
@@ -524,12 +528,14 @@ class Parking(gym.Env):
         dist_reward = 10*(self.prev_dist_to_goal - self.normalized_euclidean_distance)
         angle_reward = 0
         if np.abs(distance[1]) < 1 and np.abs(distance[0]) < 2:
-            angle_reward = 10*(self.prev_normalized_angle - self.normalized_angle)
+            angle_reward = 15*(self.prev_normalized_angle - self.normalized_angle)
+            dist_reward = (np.abs(self.prev_normalized_dist[0]) - np.abs(self.normalized_distance[0])) + ...
+            5*(np.abs(self.prev_normalized_dist[1]) - np.abs(self.normalized_distance[1])) #5*(self.prev_dist_to_goal - self.normalized_euclidean_distance) 
         reward = dist_reward + angle_reward
         
         if self.training_mode == 'off':
             print("error to goal:", distance[0], distance[1], angle_error)
-            print("normalized error to goal: ", normalized_distance[0], normalized_distance[1], self.normalized_angle)
+            print("normalized error to goal: ", self.normalized_distance[0], self.normalized_distance[1], self.normalized_angle)
             print("goal reward:", dist_reward, angle_reward, reward)
         return reward
         
