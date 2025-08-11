@@ -529,10 +529,12 @@ class Parking(gym.Env):
         # angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
         self.dist_reward = 10*(self.prev_dist_to_goal - self.normalized_euclidean_distance)
         self.angle_reward = 0
-        if np.abs(distance[1]) < 1 and np.abs(distance[0]) < 2:
-            self.angle_reward = 15*(self.prev_normalized_angle - self.normalized_angle)
-            self.dist_reward = 1*(np.abs(self.prev_normalized_dist[0]) - np.abs(self.normalized_distance[0])) + \
-            5*(np.abs(self.prev_normalized_dist[1]) - np.abs(self.normalized_distance[1])) #5*(self.prev_dist_to_goal - self.normalized_euclidean_distance) 
+        if np.abs(distance[0]) < 2:  #np.abs(distance[1]) < 1.2 and
+            self.angle_reward = 10*(self.prev_normalized_angle - self.normalized_angle)
+            self.dist_reward = 0*(np.abs(self.prev_normalized_dist[0]) - np.abs(self.normalized_distance[0])) + \
+            20*(np.abs(self.prev_normalized_dist[1]) - np.abs(self.normalized_distance[1])) #5*(self.prev_dist_to_goal - self.normalized_euclidean_distance) 
+            if distance[0] < -1.5:
+                self.dist_reward -= 0.2
         reward = self.dist_reward + self.angle_reward
         
         if self.training_mode == 'off':

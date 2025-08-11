@@ -38,14 +38,14 @@ config = Config(car_length=4.0, car_width=2.0,
                 acceleration_limit=1.0, steering_limit=0.59, velocity_limit=0.6,
                 max_angle_error=PI/12, center_threshold=0.5, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.0, 'steps': 0.01, 'steering': 0.0, 'acceleration': 0.00},
                 reward_type='type4', state_type='type4',
-                side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(3.0, 3.5)
+                side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(2.5, 2.5)
                 )
 env_config = {"render_mode": "human",
               "action_type": "continuous",
               "parking_type": "parallel",
               "training_mode": "off",
               'config': config}
-folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_47' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
+folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_13' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
 env = Parking(env_config)
 
 folder_path = create_folder_path(env_config, is_training=False)
