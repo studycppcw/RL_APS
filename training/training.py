@@ -14,7 +14,7 @@ config = Config(car_length=4.0, car_width=2.0,
                 parking_length=6.0, parking_width=2.2,
                 max_distance=25.0, max_steps=900,
                 acceleration_limit=1.0, steering_limit=0.59, velocity_limit=0.6,
-                max_angle_error=PI/12, center_threshold=0.5, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.0, 'steps': 0.01, 'steering': 0.00, 'acceleration': 0.00},
+                max_angle_error=PI/12, center_threshold=0.5, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.00, 'acceleration': 0.00},
                 reward_type='type4', state_type='type4',
                 side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(2.5, 2.5)
                 )

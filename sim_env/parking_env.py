@@ -135,6 +135,7 @@ class Parking(gym.Env):
         self.standstill_steps = None
         self.prev_v = None
         self.curr_seg = None
+        self.prev_seg = None
         self.seg_penalty = self.config.penalty_ratio['segment']
         self.steps_penalty = self.config.penalty_ratio['steps']
         self.steering_penalty = self.config.penalty_ratio['steering']
@@ -201,6 +202,7 @@ class Parking(gym.Env):
             self.prev_dist_to_goal = self.normalized_euclidean_distance
             self.prev_normalized_angle = self.normalized_angle
             self.prev_normalized_dist = self.normalized_distance
+            self.prev_seg = self.curr_seg
 
         return self.state, reward, self.terminated, self.truncated, {"step": self.run_steps}
 
@@ -259,7 +261,8 @@ class Parking(gym.Env):
         self.truncated = False
         self.run_steps = 0
         self.standstill_steps = 0
-        self.curr_seg  = 0
+        self.prev_seg  = 0
+        self.curr_seg = 0
         self.prev_action = np.array([0,0])
         self.prev_dist_to_goal = 0
         self.prev_normalized_dist = 0
@@ -376,8 +379,8 @@ class Parking(gym.Env):
         
         # check the location
         if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
-            reward -= 1
-            # self.terminated = True
+            reward -= 3
+            self.terminated = True
             print("The car crossed the parking lot vertically/horizontally.")
             return reward
 
@@ -396,17 +399,21 @@ class Parking(gym.Env):
         
         # check a collision
         if self.check_collision():
-            # reward -= 200
-            reward -= 1
+            reward -= 3
             self.terminated = True
             print("The car has a collision")
             return reward
         
         # add penalty for segment numer 
-        reward -= self.curr_seg*self.seg_penalty
-        
+        # reward -= self.curr_seg*self.seg_penalty
+        if self.curr_seg > self.prev_seg:
+            reward -= 0.1 #self.seg_penalty
+            print("segment number increased， reward is: ", reward)
+                    
         # add penalty for being idle
         reward -= self.steps_penalty #self.run_steps*self.steps_penalty
+        if self.training_mode == 'off':
+            print("after step penalty， reward is: ", reward)
         
         # add penalty for steering change
         reward -= abs(action[1]-self.prev_action[1])*self.steering_penalty
@@ -416,6 +423,8 @@ class Parking(gym.Env):
         
         # add penalty for error wrt goal
         reward += self.calc_reward_to_goal()
+        if self.training_mode == 'off':
+            print("after to goal, reward is : ", reward)
 
         # type1 (default reward)
         if self.config.reward_type == 'type1':
@@ -527,19 +536,22 @@ class Parking(gym.Env):
         self.normalized_angle = angle_error/PI #self.config.max_angle_error
 
         # angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
-        self.dist_reward = 10*(self.prev_dist_to_goal - self.normalized_euclidean_distance)
+        
+        self.dist_reward = 0
         self.angle_reward = 0
-        if np.abs(distance[0]) < 2:  #np.abs(distance[1]) < 1.2 and
-            self.angle_reward = 10*(self.prev_normalized_angle - self.normalized_angle)
-            self.dist_reward = 0*(np.abs(self.prev_normalized_dist[0]) - np.abs(self.normalized_distance[0])) + \
-            20*(np.abs(self.prev_normalized_dist[1]) - np.abs(self.normalized_distance[1])) #5*(self.prev_dist_to_goal - self.normalized_euclidean_distance) 
-            if distance[0] < -1.5:
-                self.dist_reward -= 0.2
+        if self.run_steps > 1:
+            self.dist_reward = 10*(self.prev_dist_to_goal - self.normalized_euclidean_distance)
+            if np.abs(distance[0]) < 2:  #np.abs(distance[1]) < 1.2 and
+                self.angle_reward = 10*(self.prev_normalized_angle - self.normalized_angle)
+                self.dist_reward = 0*(np.abs(self.prev_normalized_dist[0]) - np.abs(self.normalized_distance[0])) + \
+                20*(np.abs(self.prev_normalized_dist[1]) - np.abs(self.normalized_distance[1])) #5*(self.prev_dist_to_goal - self.normalized_euclidean_distance) 
+                if distance[0] < -1.5:
+                    self.dist_reward -= 0.2
         reward = self.dist_reward + self.angle_reward
         
         if self.training_mode == 'off':
-            print("error to goal:", distance[0], distance[1], angle_error)
-            print("normalized error to goal: ", self.normalized_distance[0], self.normalized_distance[1], self.normalized_angle)
+        #     print("error to goal:", distance[0], distance[1], angle_error)
+        #     print("normalized error to goal: ", self.normalized_distance[0], self.normalized_distance[1], self.normalized_angle)
             print("goal reward:", self.dist_reward, self.angle_reward, reward)
         return reward
         
