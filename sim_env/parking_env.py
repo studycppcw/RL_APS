@@ -150,6 +150,7 @@ class Parking(gym.Env):
         self.normalized_distance = None
         self.dist_reward = None
         self.angle_reward = None
+        self.angle_error = None
 
     def step(self, action):
         """
@@ -266,6 +267,7 @@ class Parking(gym.Env):
         self.prev_action = np.array([0,0])
         self.prev_dist_to_goal = 0
         self.prev_normalized_dist = 0
+        self.angle_error = 0
 
         if self.render_mode == 'human':
             self.renderer.reset_render()
@@ -379,7 +381,7 @@ class Parking(gym.Env):
         
         # check the location
         if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
-            reward -= 3
+            reward -= 4
             self.terminated = True
             print("The car crossed the parking lot vertically/horizontally.")
             return reward
@@ -399,7 +401,7 @@ class Parking(gym.Env):
         
         # check a collision
         if self.check_collision():
-            reward -= 3
+            reward -= 4
             self.terminated = True
             print("The car has a collision")
             return reward
@@ -408,12 +410,13 @@ class Parking(gym.Env):
         # reward -= self.curr_seg*self.seg_penalty
         if self.curr_seg > self.prev_seg:
             reward -= 0.1 #self.seg_penalty
-            print("segment number increased， reward is: ", reward)
+            if self.training_mode == 'off':
+                print("segment number increased, reward is: ", reward)
                     
         # add penalty for being idle
         reward -= self.steps_penalty #self.run_steps*self.steps_penalty
-        if self.training_mode == 'off':
-            print("after step penalty， reward is: ", reward)
+        # if self.training_mode == 'off':
+            # print("after step penalty， reward is: ", reward)
         
         # add penalty for steering change
         reward -= abs(action[1]-self.prev_action[1])*self.steering_penalty
@@ -423,8 +426,16 @@ class Parking(gym.Env):
         
         # add penalty for error wrt goal
         reward += self.calc_reward_to_goal()
-        if self.training_mode == 'off':
-            print("after to goal, reward is : ", reward)
+
+        # add reward for slowing down near the goal 
+        if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, 0.5, 0.2):
+            if abs(self.car.v) < abs(self.prev_v):
+                reward += 0.05
+                if self.training_mode == 'off':
+                    print("slow down near goal, reward is: ", reward)   
+
+        # if self.training_mode == 'off':
+        #     print("after to goal, reward is : ", reward)
 
         # type1 (default reward)
         if self.config.reward_type == 'type1':
@@ -437,7 +448,7 @@ class Parking(gym.Env):
         # type2 (guidance reward)
         if self.config.reward_type == 'type2':
             if self.is_car_in_parking_lot() and is_standstill:
-                if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, self.config.center_threshold):
+                if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, self.config.center_threshold, self.config.center_threshold):
                     reward += 1
                     self.terminated = True
                     print("successful parking")
@@ -464,12 +475,13 @@ class Parking(gym.Env):
 
         # type4 (velocity and guidance reward)
         if self.config.reward_type == 'type4':
-            if self.is_car_in_parking_lot() and is_standstill:
-                if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, self.config.center_threshold):
+            if 1: #self.is_car_in_parking_lot() and is_standstill:
+                if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, self.config.center_threshold, self.config.center_threshold) and np.abs(self.angle_error) < 0.05:
 
                     reward += 1
                     self.terminated = True
-                    print("successful parking")
+                    print("successful parking, angle error is: ", self.angle_error)
+                    print("final pose: ", self.car.car_loc, self.car.psi)
 
                     # velocity check
                     velocity_penalty = min(abs(self.v_penalty * (self.car.v / self.config.velocity_limit)), self.v_penalty)
@@ -534,6 +546,7 @@ class Parking(gym.Env):
         else:
             angle_error = np.abs((self.car.psi - self.parking_angle + PI) % (2 * PI) - PI)        
         self.normalized_angle = angle_error/PI #self.config.max_angle_error
+        self.angle_error = angle_error
 
         # angle_reward = 0 #-0.5*np.exp((40*normalized_angle**2))
         
@@ -549,15 +562,15 @@ class Parking(gym.Env):
                     self.dist_reward -= 0.2
         reward = self.dist_reward + self.angle_reward
         
-        if self.training_mode == 'off':
+        # if self.training_mode == 'off':
         #     print("error to goal:", distance[0], distance[1], angle_error)
         #     print("normalized error to goal: ", self.normalized_distance[0], self.normalized_distance[1], self.normalized_angle)
-            print("goal reward:", self.dist_reward, self.angle_reward, reward)
+            # print("goal reward:", self.dist_reward, self.angle_reward, reward)
         return reward
         
 
     @staticmethod
-    def is_car_in_threshold(parking_lot: np.ndarray, car_loc: np.ndarray, center_threshold: np.float32) -> bool:
+    def is_car_in_threshold(parking_lot: np.ndarray, car_loc: np.ndarray, x_threshold: np.float32, y_threshold: np.float32) -> bool:
         """
         Determines whether the car has successfully parked within the designated parking lot.
         The function checks if the car's center is within a defined threshold distance from the parking lot center.
@@ -572,7 +585,7 @@ class Parking(gym.Env):
             bool: True if the car is within the parking lot and within the threshold distance, False otherwise.
         """
         distance = abs(parking_lot - car_loc)
-        if distance[0] <= center_threshold and distance[1] <= center_threshold:
+        if distance[0] <= x_threshold and distance[1] <= y_threshold:
             return True
         return False
 
