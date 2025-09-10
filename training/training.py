@@ -1,4 +1,24 @@
 import os
+os.environ["OMP_NUM_THREADS"] = "1"        # limit OpenMP threads
+os.environ["MKL_NUM_THREADS"] = "1"        # if NumPy uses MKL
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # last resort but usually needed on macOS
+
+import random
+import numpy as np
+import torch
+
+enable_torch_deterministic = False
+
+if enable_torch_deterministic:
+# Set all seeds BEFORE importing Ray or initializing RLlib
+    SEED = 42
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+
 import ray
 import time
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -6,15 +26,21 @@ from sim_env.parking_env import Parking
 from sim_env.parameters import Config, PI
 from utility import custom_log_creator, custom_log_checkpoint, create_folder_path, create_folder_name
 
-
-ray.init()
+if enable_torch_deterministic:
+    ray.init(runtime_env={"env_vars": {
+        "OMP_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "KMP_DUPLICATE_LIB_OK": "TRUE"
+    }})
+else:
+    ray.init()
 env_name = Parking
 config = Config(car_length=4.0, car_width=2.0,
                 wheel_length=0.75, wheel_width=0.35,
                 parking_length=6.0, parking_width=2.2,
                 max_distance=25.0, max_steps=900,
                 acceleration_limit=1.0, steering_limit=0.59, velocity_limit=0.6,
-                max_angle_error=PI/12, center_threshold=0.2, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.00, 'acceleration': 0.00},
+                max_angle_error=PI/12, center_threshold=0.1, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.00, 'acceleration': 0.00},
                 reward_type='type4', state_type='type4',
                 side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(2.5, 2.5)
                 )
@@ -36,7 +62,9 @@ folder_name = create_folder_name('PPO', env_config, config.reward_type, config.s
 
 algo = (
     PPOConfig()
-    .environment(env=env_name, env_config=env_config)
+    .environment(env=env_name, 
+                 env_config={**env_config, "seed": SEED} if enable_torch_deterministic else env_config
+                 )
     .rollouts(num_rollout_workers=1)
     # .training(
     #     lr=1e-4,
@@ -65,6 +93,9 @@ algo = (
     .evaluation(evaluation_num_workers=1)
     .build(logger_creator=custom_log_creator(folder_path, folder_name))
 )
+
+if enable_torch_deterministic:
+    config.seed = SEED
 
 start_time = time.time()
 # training

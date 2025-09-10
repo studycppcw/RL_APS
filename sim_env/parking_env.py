@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import math
 import gymnasium as gym
 from typing import Optional, Union, List
@@ -62,6 +63,8 @@ class Parking(gym.Env):
         Parameters:
             env_config: contains the action type, render mode and parking type
         """
+        seed = env_config.get("seed", 42)
+        self.seed(seed)
         super().__init__()
 
         # Check env_config
@@ -151,6 +154,13 @@ class Parking(gym.Env):
         self.dist_reward = None
         self.angle_reward = None
         self.angle_error = None
+        self.action = None
+    
+    def seed(self, seed=None):
+        self.np_random, seed = gym.utils.seeding.np_random(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        return [seed]
 
     def step(self, action):
         """
@@ -190,7 +200,7 @@ class Parking(gym.Env):
                         f"Valid values are from 0 to 5")
 
             self.car.loc_old = self.car.car_loc
-            self.prev_v = self.car.v
+            self.action = action
             self.car.kinematic_act(action)
 
             
@@ -204,6 +214,8 @@ class Parking(gym.Env):
             self.prev_normalized_angle = self.normalized_angle
             self.prev_normalized_dist = self.normalized_distance
             self.prev_seg = self.curr_seg
+            self.prev_v = self.car.v
+
 
         return self.state, reward, self.terminated, self.truncated, {"step": self.run_steps}
 
@@ -227,7 +239,7 @@ class Parking(gym.Env):
         if mode == "human":
             self.renderer.initialize_window()
             self.renderer.draw_static_elements(self.parking_lot_vertices, self.static_parking_lot_vertices, self.static_cars_vertices)
-            self.renderer.render(self.car, self.car.loc_old, reward, self.parking_lot, self.dist_reward, self.angle_reward, self.curr_seg)
+            self.renderer.render(self.car, self.car.loc_old, reward, self.parking_lot, self.dist_reward, self.angle_reward, self.curr_seg, self.action[0], self.action[1])
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
@@ -268,10 +280,13 @@ class Parking(gym.Env):
         self.prev_dist_to_goal = 0
         self.prev_normalized_dist = 0
         self.angle_error = 0
+        self.prev_v = 0
 
         if self.render_mode == 'human':
             self.renderer.reset_render()
-
+        
+        if self.training_mode == 'off':
+            print("reset position:", self.car.car_loc, "heading:", self.car.psi)
         return self.state, {}
 
     def get_normalized_state(self):
@@ -369,6 +384,7 @@ class Parking(gym.Env):
             self.truncated = True
             # self.terminated = True
             print("The maximum step reaches")
+            print("final segment number is:", self.curr_seg)
             return reward
         
         # check if segment number exceed limit
@@ -384,12 +400,14 @@ class Parking(gym.Env):
             reward -= 4
             self.terminated = True
             print("The car crossed the parking lot vertically/horizontally.")
+            print("final segment number is: ", self.curr_seg)
             return reward
 
         if self.check_max_distance(self.parking_lot_vertices, self.car.car_loc, self.config.max_distance):
             reward -= 1
             self.terminated = True
             print(f"The distance between the car and the parking is more than {self.config.max_distance} meters")
+            print("final segment number is: ", self.curr_seg)
             return reward
 
         # check if car stopped outside of slot
@@ -404,14 +422,15 @@ class Parking(gym.Env):
             reward -= 4
             self.terminated = True
             print("The car has a collision")
+            print("final segment number is: ", self.curr_seg)
             return reward
         
         # add penalty for segment numer 
         # reward -= self.curr_seg*self.seg_penalty
         if self.curr_seg > self.prev_seg:
             reward -= 0.1 #self.seg_penalty
-            if self.training_mode == 'off':
-                print("segment number increased, reward is: ", reward)
+            # if self.training_mode == 'off':
+            #     print("segment number increased, reward is: ", reward)
                     
         # add penalty for being idle
         reward -= self.steps_penalty #self.run_steps*self.steps_penalty
@@ -428,7 +447,7 @@ class Parking(gym.Env):
         reward += self.calc_reward_to_goal()
 
         # add reward for slowing down near the goal 
-        if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, 0.5, 0.2):
+        if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, 0.5, 0.1):
             if abs(self.car.v) < abs(self.prev_v):
                 reward += 0.05
                 if self.training_mode == 'off':
@@ -475,13 +494,15 @@ class Parking(gym.Env):
 
         # type4 (velocity and guidance reward)
         if self.config.reward_type == 'type4':
-            if 1: #self.is_car_in_parking_lot() and is_standstill:
+            if 1: #np.abs(self.car.v) < 0.1: 
+            # if self.is_car_in_parking_lot() and is_standstill:
                 if self.is_car_in_threshold(self.parking_lot, self.car.car_loc, self.config.center_threshold, self.config.center_threshold) and np.abs(self.angle_error) < 0.05:
 
                     reward += 1
                     self.terminated = True
                     print("successful parking, angle error is: ", self.angle_error)
                     print("final pose: ", self.car.car_loc, self.car.psi)
+                    print(f"final segment number is {self.curr_seg}, final vel is: {self.car.v:.2f}")
 
                     # velocity check
                     velocity_penalty = min(abs(self.v_penalty * (self.car.v / self.config.velocity_limit)), self.v_penalty)
@@ -504,8 +525,8 @@ class Parking(gym.Env):
     def check_segment_number(self):
         if(self.car.v > 0 and self.prev_v <= 0) or (self.car.v < 0 and self.prev_v >= 0):
             self.curr_seg += 1
-            if self.training_mode == 'off':
-                print("curr seg is ", self.curr_seg)
+            # if self.training_mode == 'off':
+            #     print("curr seg is ", self.curr_seg)
         
     
     def is_car_in_standstill(self, v_current: float) -> bool:

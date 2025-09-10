@@ -1,3 +1,19 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"   # required on macOS if duplicate libomp is unavoidable
+
+
+import random
+import numpy as np
+import torch
+
+seed = 42
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+
 import time
 from ray.rllib.algorithms.ppo import PPO
 from parameters import Config, PI
@@ -36,7 +52,7 @@ config = Config(car_length=4.0, car_width=2.0,
                 parking_length=6.0, parking_width=2.2,
                 max_distance=25.0, max_steps=900,
                 acceleration_limit=1.0, steering_limit=0.59, velocity_limit=0.6,
-                max_angle_error=PI/12, center_threshold=0.2, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.0, 'acceleration': 0.00},
+                max_angle_error=PI/12, center_threshold=0.1, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.0, 'acceleration': 0.00},
                 reward_type='type4', state_type='type4',
                 side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(2.5, 2.5)
                 )
@@ -45,23 +61,27 @@ env_config = {"render_mode": "human",
               "parking_type": "parallel",
               "training_mode": "off",
               'config': config}
-folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th02_ar03_vr01_segr02_stpr00_strr00_acclr00_3' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
+folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th01_ar03_vr01_segr02_stpr00_strr00_acclr00_7' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
+# env = Parking({**env_config,"render_mode":"human"})
 env = Parking(env_config)
+env.reset(seed=seed)
 
 folder_path = create_folder_path(env_config, is_training=False)
 folder_path = folder_path.replace('sim_env', 'training')
 
 algo = PPO.from_checkpoint(folder_path + folder_name)
+algo.config["seed"] = seed
+
 episode_reward = 0
 for i in range(10):
     episode_reward = 0
     terminated = truncated = False
-    obs, info = env.reset()
+    obs, info = env.reset(seed=seed)
     # env.render(episode_reward)
     actions = []
     while not terminated and not truncated:
         # Algorithm.compute_single_action() is to programmatically compute actions from a trained agent.
-        action = algo.compute_single_action(obs)
+        action = algo.compute_single_action(obs, explore=False)
         # action = env.action_space.sample()  # env.action_space.sample() is to sample random actions.
         # action = int(input("Action: "))
         actions.append(action)
