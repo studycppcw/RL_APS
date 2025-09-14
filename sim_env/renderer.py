@@ -93,7 +93,7 @@ class Renderer:
             for car_vertex in static_cars_vertices:
                 self.draw_object(self.surf_parkinglot, self.colors["GREY"], car_vertex)
 
-    def draw_text_display(self, car_loc, v, psi, reward, parking_lot, dist_reward, angle_reward, curr_seg) -> None:
+    def draw_text_display(self, car_loc, v, psi, reward, parking_lot, dist_reward, angle_reward, curr_seg, accl, steer) -> None:
         """Draw text display"""
         # Clear previous text
         self.surf_text.fill((0, 0, 0, 0))
@@ -103,7 +103,9 @@ class Renderer:
                     f'Heading angle: {psi}\nDegree: {psi * (180 / PI)}\n'
                     f'reward: {reward}\nGoal Location: {parking_lot}\n'
                     f'Distance Reward: {dist_reward}\nAngle Reward: {angle_reward}\n'
-                    f'Current Segment: {curr_seg}\n')
+                    f'Current Segment: {curr_seg}\n'
+                    f'accleration: {accl}\n'
+                    f'steering: {steer}\n')
 
         # Define the rectangle area for the text display
         text_rect = pygame.Rect(200, 300, 100, 200)
@@ -140,16 +142,16 @@ class Renderer:
             wheel_vertices += wheel_point + car_loc
             self.draw_object(self.surf_car, self.colors["RED"], wheel_vertices)
 
-    def draw_dynamic_elements(self, car: Car, car_loc, car_loc_old, reward, parking_lot, dist_reward, angle_reward, curr_seg) -> None:
+    def draw_dynamic_elements(self, car: Car, car_loc, car_loc_old, reward, parking_lot, dist_reward, angle_reward, curr_seg, accl, steer) -> None:
         """Draw car, movement path, and text updates."""
         self.draw_car(car, car_loc)
         self.draw_car_path(car_loc_old, car_loc)
-        self.draw_text_display(car_loc, car.v, car.psi, reward, parking_lot, dist_reward, angle_reward, curr_seg)
+        self.draw_text_display(car_loc, car.v, car.psi, reward, parking_lot, dist_reward, angle_reward, curr_seg, accl, steer)
 
-    def render(self, car: Car, car_loc_old, reward, parking_lot, dist_reward, angle_reward, curr_seg) -> None:
+    def render(self, car: Car, car_loc_old, reward, parking_lot, dist_reward, angle_reward, curr_seg, accl, steer) -> None:
         """Render the environment with updated car position."""
         # Draw the dynamic objects
-        self.draw_dynamic_elements(car, car.car_loc, car_loc_old, reward, parking_lot, dist_reward, angle_reward, curr_seg)
+        self.draw_dynamic_elements(car, car.car_loc, car_loc_old, reward, parking_lot, dist_reward, angle_reward, curr_seg, accl, steer)
 
         # Compose final frame
         surf = self.surf_parkinglot.copy()
