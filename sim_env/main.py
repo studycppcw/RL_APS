@@ -31,12 +31,13 @@ from training.utility import create_folder_path
 #                 reward_type='type4', state_type='type4',
 #                 side=1, car_loc_randomize_range=(6.0, 7.0), initial_distance_range=(5.0, 7.0)
 #                 )
-config = Config(car_length=4.0, car_width=2.0,
+config = Config(car_length=5.12, car_width=2.0,
+                car_wheelbase_front=1.44, car_wheelbase_rear=1.52,
                 wheel_length=0.75, wheel_width=0.35,
-                parking_length=6.0, parking_width=2.2,
+                parking_length=7.0, parking_width=2.2,
                 max_distance=25.0, max_steps=900,
                 acceleration_limit=1.0, steering_limit=0.59, velocity_limit=0.6,
-                max_angle_error=PI/12, center_threshold=0.2, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.0, 'acceleration': 0.00},
+                max_angle_error=PI/12, center_threshold=0.1, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.0, 'acceleration': 0.00},
                 reward_type='type4', state_type='type4',
                 side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(2.5, 2.5)
                 )
@@ -45,7 +46,8 @@ env_config = {"render_mode": "human",
               "parking_type": "parallel",
               "training_mode": "off",
               'config': config}
-folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th02_ar03_vr01_segr02_stpr00_strr00_acclr00_3' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
+# folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th01_ar03_vr01_segr02_stpr00_strr00_acclr00_8'
+folder_name = 'PPO_parallel_continuous_200_r4_s4_b_th01_ar03_vr01_segr02_stpr00_strr00_acclr00_22' #'PPO_parallel_continuous_200_r4_s4_b_th05_ar03_vr01_segr00_stpr00_strr00_acclr00_1' #'PPO_parallel_continuous_100_r4_s4_b_th08_ar04_vr01_2' # #  # trained_agent folder
 env = Parking(env_config)
 
 folder_path = create_folder_path(env_config, is_training=False)
@@ -61,7 +63,7 @@ for i in range(10):
     actions = []
     while not terminated and not truncated:
         # Algorithm.compute_single_action() is to programmatically compute actions from a trained agent.
-        action = algo.compute_single_action(obs)
+        action = algo.compute_single_action(obs,explore=True)
         # action = env.action_space.sample()  # env.action_space.sample() is to sample random actions.
         # action = int(input("Action: "))
         actions.append(action)

@@ -30,7 +30,7 @@ class Car:
         x_dot = self.v * np.cos(self.psi)
         y_dot = self.v * np.sin(self.psi)
         v_dot = action[0]
-        psi_dot = self.v * np.tan(action[1]) / self.car_size.length
+        psi_dot = self.v * np.tan(action[1]) / self.car_size.wheel_base
         car_loc = np.array([x_dot, y_dot])
         self.update_state(car_loc, v_dot, psi_dot, self.config.dt)
         self.delta = action[1]

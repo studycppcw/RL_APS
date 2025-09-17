@@ -19,19 +19,24 @@ class CarSize:
         - Length: 4 meters
         - Width: 2 meters
     """
-    def __init__(self, length: float = 4.0, width: float = 2.0):
+    def __init__(self, length: float = 4.0, width: float = 2.0, wheel_base_front: float = 1.0, wheel_base_rear: float = 1.0):
         self.length = np.float32(length)
         self.width = np.float32(width)
-        self.car_struct = np.array([[+self.length / 2, +self.width / 2],
-                                    [+self.length / 2, -self.width / 2],
-                                    [-self.length / 2, -self.width / 2],
-                                    [-self.length / 2, +self.width / 2]],
+        self.wheel_base_front = np.float32(wheel_base_front)
+        self.wheel_base_rear = np.float32(wheel_base_rear)
+        self.wheel_base = self.wheel_base_front + self.wheel_base_rear
+        self.front_overhang = self.length/2 - self.wheel_base_front
+        self.rear_overhang = self.length/2 - self.wheel_base_rear
+        self.car_struct = np.array([[+self.wheel_base + self.front_overhang, +self.width / 2],
+                                    [+self.wheel_base + self.front_overhang, -self.width / 2],
+                                    [-self.rear_overhang, -self.width / 2],
+                                    [-self.rear_overhang, +self.width / 2]],
                                    dtype=np.float32)
 
-        self.car_struct_2 = np.array([[+self.width / 2, +self.length / 2],
-                                      [+self.width / 2, -self.length / 2],
-                                      [-self.width / 2, -self.length / 2],
-                                      [-self.width / 2, +self.length / 2]],
+        self.car_struct_2 = np.array([[+self.width / 2, +self.wheel_base + self.front_overhang],
+                                      [+self.width / 2, -self.rear_overhang],
+                                      [-self.width / 2, -self.rear_overhang],
+                                      [-self.width / 2, +self.wheel_base + self.front_overhang]],
                                      dtype=np.float32)
 
 
@@ -56,7 +61,7 @@ class WheelSize:
         - Top left: (-1.25, 0.75)
     """
 
-    def __init__(self, length: float = 0.75, width: float = 0.35):
+    def __init__(self, length: float = 0.75, width: float = 0.35, wheel_base: float = 2.5):
         self.length = np.float32(length)
         self.width = np.float32(width)
 
@@ -65,10 +70,10 @@ class WheelSize:
                                       [-self.length / 2, -self.width / 2],
                                       [-self.length / 2, +self.width / 2]],
                                      dtype=np.float32)
-        self.wheel_pos = np.array([[1.25, 0.75],
-                                   [1.25, -0.75],
-                                   [-1.25, -0.75],
-                                   [-1.25, 0.75]],
+        self.wheel_pos = np.array([[wheel_base, 0.75],
+                                   [wheel_base, -0.75],
+                                   [0, -0.75],
+                                   [0, 0.75]],
                                   dtype=np.float32)
 
 
@@ -218,6 +223,7 @@ class Config:
 
     def __init__(self,
                  car_length: float = 4.0, car_width: float = 2.0,
+                 car_wheelbase_front: float = 1.0, car_wheelbase_rear: float = 1.0,
                  wheel_length: float = 0.75, wheel_width: float = 0.35,
                  parking_length: float = 6.0, parking_width: float = 4.0,
                  max_distance: float = 25.0, max_steps: int = 80,
@@ -228,8 +234,8 @@ class Config:
                  car_loc_randomize_range: tuple = (-5, 5), initial_distance_range: tuple = (7.5, 15.0),
                  heading_angle_range: dict = None
                  ):
-        self.car_size = CarSize(car_length, car_width)
-        self.wheel_size = WheelSize(wheel_length, wheel_width)
+        self.car_size = CarSize(car_length, car_width, car_wheelbase_front, car_wheelbase_rear)
+        self.wheel_size = WheelSize(wheel_length, wheel_width, self.car_size.wheel_base)
         self.parking_lot_size = ParkingLotSize(parking_length, parking_width)
 
         # Reward and State settings

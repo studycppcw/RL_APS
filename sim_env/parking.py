@@ -192,18 +192,26 @@ class ParallelParking(BaseParking):
 
         offset = self.parking_lot_size.offset_parallel
 
+        cog_to_rear_axle = (self.car_size.length/2 - self.car_size.rear_overhang)
+
         if side in [1, 2]:
-            static_cars_loc = np.array([[parking_lot[0] + offset, parking_lot[1]],
+            static_cars_loc_cog = np.array([[parking_lot[0] + offset, parking_lot[1]],
                                         [parking_lot[0] - offset, parking_lot[1]]])
+            static_cars_loc = np.array([[parking_lot[0] + offset - cog_to_rear_axle, parking_lot[1]],
+                                        [parking_lot[0] - offset - cog_to_rear_axle, parking_lot[1]]])
         else:
-            static_cars_loc = np.array([[parking_lot[0], parking_lot[1] + offset],
+            static_cars_loc_cog = np.array([[parking_lot[0], parking_lot[1] + offset],
                                         [parking_lot[0], parking_lot[1] - offset]])
+            static_cars_loc = np.array([[parking_lot[0], parking_lot[1] + offset - cog_to_rear_axle],
+                                        [parking_lot[0], parking_lot[1] - offset - cog_to_rear_axle]])
 
         parking_struct = self.get_parking_struct(parking_type="parallel", side=side)
         car_struct = self.get_car_struct(parking_type="parallel", side=side)
-        for loc in static_cars_loc:
-            static_cars_vertices.append(car_struct + loc)
+        for loc in static_cars_loc_cog:
             static_parking_vertices.append(parking_struct + loc)
+        for loc in static_cars_loc:          
+            static_cars_vertices.append(car_struct + loc)
+
         return static_cars_vertices, static_parking_vertices
 
 

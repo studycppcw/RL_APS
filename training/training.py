@@ -9,12 +9,13 @@ from utility import custom_log_creator, custom_log_checkpoint, create_folder_pat
 
 ray.init()
 env_name = Parking
-config = Config(car_length=4.0, car_width=2.0,
+config = Config(car_length=5.12, car_width=2.0,
+                car_wheelbase_front=1.44, car_wheelbase_rear=1.52,
                 wheel_length=0.75, wheel_width=0.35,
-                parking_length=6.0, parking_width=2.2,
+                parking_length=7, parking_width=2.2,
                 max_distance=25.0, max_steps=900,
                 acceleration_limit=1.0, steering_limit=0.59, velocity_limit=0.6,
-                max_angle_error=PI/12, center_threshold=0.2, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.00, 'acceleration': 0.00},
+                max_angle_error=PI/12, center_threshold=0.1, penalty_ratio={'angle': 0.35, 'velocity': 0.15, 'segment': 0.2, 'steps': 0.01, 'steering': 0.00, 'acceleration': 0.00},
                 reward_type='type4', state_type='type4',
                 side=1, car_loc_randomize_range=(10.0, 10.0), initial_distance_range=(2.5, 2.5)
                 )
@@ -25,7 +26,7 @@ env_config = {"render_mode": "no_render",
               'config': config}
 
 # for folder names
-num_train = 200
+num_train = 200 #250
 side = config.side
 threshold = config.center_threshold
 angle_ratio, v_ratio, seg_ratio, steps_ratio, steering_ratio, acceleration_ratio = config.penalty_ratio['angle'], config.penalty_ratio['velocity'], config.penalty_ratio['segment'], config.penalty_ratio['steps'], config.penalty_ratio['steering'],config.penalty_ratio['acceleration']
