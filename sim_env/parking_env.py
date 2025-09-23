@@ -399,7 +399,7 @@ class Parking(gym.Env):
         
         # check the location
         if self.check_cross_border(self.parking_lot_vertices, self.side, self.car.car_vertices):
-            reward -= 4
+            reward -= 4.5
             self.terminated = True
             print("The car crossed the parking lot vertically/horizontally.")
             print("final segment number is: ", self.curr_seg)
@@ -421,7 +421,7 @@ class Parking(gym.Env):
         
         # check a collision
         if self.check_collision():
-            reward -= 4
+            reward -= 4.5
             self.terminated = True
             print("The car has a collision")
             print("final segment number is: ", self.curr_seg)
